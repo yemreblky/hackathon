@@ -26,59 +26,86 @@ def haberi_tamamen_kazi(url):
 
 # --- ADEM'İN HARİKA BIOS-FIT HESAPLAMA ALGORİTMASI ---
 def calculate_bios_fit_score(ai_json, source_url):
-    # E: Olay Tipi (Ağırlık: %30)
-    E = 0.10
-    event_type = str(ai_json.get("event_type", "")).lower() if ai_json.get("event_type") else ""
-    if event_type == "relocation": E = 1.00
-    elif event_type == "new_plant": E = 0.90
-    elif event_type == "expansion": E = 0.75
-    elif event_type == "tender": E = 0.55
-    elif event_type == "closure": E = 0.45
+    # PDF'TEKİ GİBİ GEÇERSİZ/BOŞ DEĞER KONTROLÜ
+    def is_valid(val):
+        v = str(val).lower().strip()
+        return v and v not in ["null", "none", "", "belirtilmemiş"]
 
-    # A: Aktör Netliği (Ağırlık: %25)
-    A = 0.0
-    if ai_json.get("company") and str(ai_json.get("company")).lower() != "null": A += 0.40
-    if ai_json.get("from_location") and str(ai_json.get("from_location")).lower() != "null": A += 0.25
-    if ai_json.get("to_location") and str(ai_json.get("to_location")).lower() != "null": A += 0.25
-    if ai_json.get("sector") and str(ai_json.get("sector")).lower() != "null": A += 0.10
-
-    # G: Coğrafya (Ağırlık: %20)
-    G = 0.30
-    locations = f"{ai_json.get('from_location', '')} {ai_json.get('to_location', '')}".lower()
-    avrupa_kelimeleri = ["türkiye", "almanya", "fransa", "avrupa", "ingiltere", "italya", "ispanya", "polonya", "romanya"]
+    # 1. E: Olay Tipi (Event Type) - Ağırlık: %30
+    E = 0.10  # Varsayılan: other = 0.10
     
-    if any(ulke in locations for ulke in avrupa_kelimeleri):
+    # LLM artık tekil etiket dönüyor.
+    event_text = str(ai_json.get("event_type", "other")).lower()
+
+    # ZEKİCE KISIM: En yüksek puandan başlayarak arıyoruz. 
+    # Metin içinde birden fazla olay geçse bile, ilk (ve en yüksek) olanı bulduğunda
+    # E değerini atar ve diğer elif bloklarına girmez. Böylece otomatik olarak 'max' değeri almış oluruz.
+    if "relocation" in event_text: E = 1.00
+    elif "new_plant" in event_text: E = 0.90
+    elif "expansion" in event_text: E = 0.75
+    elif "tender" in event_text: E = 0.55
+    elif "closure" in event_text: E = 0.45
+
+    # 2. A: Aktör Netliği (Actor Clarity) - Ağırlık: %25
+    A = 0.0
+    if is_valid(ai_json.get("company")): A += 0.40
+    if is_valid(ai_json.get("from_location")): A += 0.25
+    if is_valid(ai_json.get("to_location")): A += 0.25
+    if is_valid(ai_json.get("sector")): A += 0.10
+    A = min(A, 1.0) # Toplamın 1'i geçmemesi için güvenlik
+
+    # 3. G: Coğrafya (Geography) - Ağırlık: %20
+    G = 0.30 # Varsayılan: Bilinmiyor = 0.30
+    locations = f"{ai_json.get('from_location', '')} {ai_json.get('to_location', '')}".lower()
+    
+    avrupa_ici = ["türkiye", "almanya", "fransa", "ingiltere", "birleşik krallık", "italya", "ispanya", "polonya", "romanya", "bulgaristan", "yunanistan", "sırbistan", "avrupa", "ab"]
+    komsular = ["rusya", "kuzey afrika", "mısır", "fas", "cezayir", "tunus", "ukrayna"]
+    
+    if any(ulke in locations for ulke in avrupa_ici):
         G = 1.00
-    elif len(locations) > 5 and "null" not in locations:
-        G = 0.10
+    elif any(ulke in locations for ulke in komsular):
+        G = 0.50
+    elif is_valid(ai_json.get("from_location")) or is_valid(ai_json.get("to_location")):
+        G = 0.10 # Konum var ama Avrupa/Komşu değilse "Diğer"
 
-    # T: Zaman Penceresi & C: Kaynak Güveni
-    T = 0.30
-    C = 0.55
+    # 4. T: Zaman Penceresi (Timeline) - Ağırlık: %15
+    T = 0.30 # Varsayılan: Belirtilmemiş = 0.30
+    # LLM direkt "zaman" döndürmediği için, çıkardığı Türkçe özetin içinde kelime araması yapıyoruz
+    summary_text = str(ai_json.get("summary_tr", "")).lower()
+    
+    if any(word in summary_text for word in ["duyuruldu", "taşınacak", "çeyrek", "yakın zaman", "0-6 ay", "kısa süre", "hemen"]):
+        T = 1.00
+    elif any(word in summary_text for word in ["6-18 ay", "önümüzdeki yıl", "gelecek yıl", "planlanıyor"]):
+        T = 0.70
+    elif any(word in summary_text for word in ["18-36 ay", "uzun vadede"]):
+        T = 0.40
+
+    # 5. C: Kaynak Güveni (Source Trust) - Ağırlık: %10
+    C = 0.55 # Varsayılan: Genel haber sitesi = 0.55
     url = str(source_url).lower()
-    if any(domain in url for domain in ["reuters", "bloomberg", "ft.com"]): C = 0.85
-    elif any(domain in url for domain in ["industryweek", "manufacturing"]): C = 0.70
+    
+    if any(domain in url for domain in ["ir.", "investor", "press-release", "corp.", "pr-newswire"]): 
+        C = 1.00 # Şirketin resmi sitesi / IR
+    elif any(domain in url for domain in ["reuters", "bloomberg", "ft.com", "handelsblatt"]): 
+        C = 0.85 # Saygın haber ajansı
+    elif any(domain in url for domain in ["industryweek", "manufacturing", "supplychainbrain", "tradefinance"]): 
+        C = 0.70 # Sektörel yayın
+    elif any(domain in url for domain in ["blog", "forum", "reddit", "medium"]): 
+        C = 0.25 # Blog / forum
 
-    # FİNAL SKORU HESAPLAMA
+    # PDF'TEKİ AĞIRLIKLI FİNAL SKORU HESAPLAMA (Ekstra ceza çarpanları kaldırıldı)
     raw_score = 100 * (0.30 * E + 0.25 * A + 0.20 * G + 0.15 * T + 0.10 * C)
 
-    # Güven (Confidence) Puanı
-    filled_fields = 0
-    for key in ["company", "from_location", "to_location", "sector", "event_type"]:
-        if ai_json.get(key) and str(ai_json.get(key)).lower() != "null":
-            filled_fields += 1
-
-    confidence = filled_fields / 5.0
-    if confidence < 0.40:
-        raw_score *= 0.5 # Veri çok eksikse puanı yarıya düşür
-
-    # Puanları ana sözlüğe ekle ve geri dön
+    # Puanları sözlüğe ekle (Confidence veritabanında istendiği için formül içindeki saf netlik A'yı atıyoruz)
     ai_json["score"] = round(raw_score)
-    ai_json["confidence"] = round(confidence, 2)
+    ai_json["confidence"] = round(A, 2) # Güven skoru artık "Aktör Netliği" tablosundan geliyor
     ai_json["source_url"] = source_url
 
     return ai_json
-# ---------------------------------------------------
+
+#---------------------------------------------------
+
+
 
 def process_news_with_adem():
     conn = sqlite3.connect('hackathon.db')
@@ -111,8 +138,7 @@ def process_news_with_adem():
         payload = {
             "model": MODEL_NAME,
             "messages": [
-                # PROMPT GÜNCELLENDİ: Artık başlığı değil, kullanılan dev metni okuyor.
-                {"role": "user", "content": f"Sen bir sanayi analistisin. Haberi analiz et ve SADECE JSON formatında event_type, company, sector, from_location, to_location, summary_tr alanlarını doldurarak çıktı ver. Haber Metni: {kullanilacak_metin}"}
+                {"role": "user", "content": f"Sen bir sanayi analistisin. Haberi analiz et ve SADECE JSON formatında event_type, company, sector, from_location, to_location, summary_tr alanlarını doldurarak çıktı ver. event_type alanına SADECE haberdeki en önemli ANA OLAYI temsil eden TEK BİR ETİKET yaz (closure, relocation, new_plant, expansion, tender veya other). Asla liste veya virgüllü metin kullanma. Haber Metni: {kullanilacak_metin}"}
             ],
             "format": "json",
             "stream": False

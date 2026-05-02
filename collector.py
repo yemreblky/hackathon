@@ -17,7 +17,7 @@ def add_real_sources():
         #('Supply Chain Brain', 'https://www.supplychainbrain.com/rss', 'EN'),
         
         # 3. NTV Ekonomi (Türkiye'deki yerel fabrika ve ekonomi haberleri için sağlam kaynak)
-        #('NTV Ekonomi', 'https://www.ntv.com.tr/ekonomi.rss', 'TR'),
+        ('NTV Ekonomi', 'https://www.ntv.com.tr/ekonomi.rss', 'TR'),
         
         # 4. PR Newswire Endüstri (Şirketlerin "Yeni fabrika açıyoruz" diye resmi basın bülteni attığı yer!)
         #('PR Newswire Industrial', 'https://www.prnewswire.com/rss/industrial-metals-news.rss', 'EN')
