@@ -32,7 +32,6 @@ Algoritmamız LLM'den gelen JSON verisini şu katsayılarla işler:
 4. **Zaman Penceresi (T) - %15:** Modelin oluşturduğu `summary_tr` (Türkçe Özet) içerisindeki tarih/çeyrek anahtar kelimeleri (örn: "in q", "yakın zaman", "0-6 ay") taranarak elde edilir[cite: 2].
 5. **Kaynak Güveni (C) - %10:** Haberin geldiği domain (URL) regex/metin araması ile sınıflandırılır; resmi şirket siteleri (ir., investor) en yüksek, forumlar en düşük puanı alır[cite: 2].
 
-*Not: Eğer güven puanı (confidence) düşükse, yanıltıcı sonuçları engellemek için sistem skora yumuşatma (ceza) uygulayarak ağırlığı düşürmektedir[cite: 10].*
 
 ## ⚙️ Kurulum ve Çalıştırma Adımları
 Projeyi lokal ortamda test etmek için sırasıyla aşağıdaki adımları izleyin:
