@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Sicht - Endüstriyel Haber Radarı</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sol Panel: RSS Yönetimi (F1, F2, 5.2) -->
+        <aside class="sidebar">
+            <h2>RSS Kaynakları</h2>
+            <div class="rss-input-group">
+                <input type="text" id="rssUrlInput" placeholder="RSS URL'si girin...">
+                <button id="addRssBtn">Ekle</button>
+            </div>
+            <ul id="rssList" class="rss-list">
+                <!-- JS (renderRssList) tarafından doldurulur -->
+            </ul>
+        </aside>
+
+        <!-- Ana İçerik Alanı (5.1) -->
+        <main class="main-content">
+            <header class="top-bar">
+                <!-- F9: Anahtar kelime ile arama -->
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Haberlerde veya şirketlerde ara...">
+                </div>
+                
+                <div class="filters">
+                    <!-- F8: Sıralama Seçenekleri -->
+                    <select id="sortFilter">
+                        <option value="default">Sırala: Varsayılan</option>
+                        <option value="scoreDesc">Skor (Yüksekten Düşüğe)</option>
+                        <option value="scoreAsc">Skor (Düşükten Yükseğe)</option>
+                        <option value="dateDesc">Tarih (En Yeni)</option>
+                        <option value="dateAsc">Tarih (En Eski)</option>
+                        <option value="source">Kaynak (A-Z)</option>
+                    </select>
+
+                    <!-- F8: Tarih Filtresi -->
+                    <input type="date" id="dateFilter">
+    
+                    <!-- F7b & F8: Minimum Skor Filtresi -->
+                    <select id="scoreFilter">
+                        <option value="0">Min. Skor: Tümü</option>
+                        <option value="50">Skor: 50+</option>
+                        <option value="80">Skor: 80+</option>
+                    </select>
+
+                    <!-- F7 & F8: Olay Tipi Filtresi -->
+                    <select id="typeFilter">
+                        <option value="all">Tüm Olaylar</option>
+                        <option value="relocation">Taşıma (Relocation)</option>
+                        <option value="closure">Kapanış (Closure)</option>
+                        <option value="expansion">Genişleme (Expansion)</option>
+                        <option value="new_plant">Yeni Yatırım</option>
+                        <option value="tender">İhale (Tender)</option>
+                        <option value="other">Diğer</option>
+                    </select>
+
+                    <!-- F5.1: Son Güncelleme Zamanı (Sağ üst grup) -->
+                    <span id="lastUpdate" style="font-size: 0.8rem; color: #64748b; align-self: center; margin-right: 5px; font-weight: 500;"></span>
+                    
+                    <!-- F4: Manuel Yenileme Butonu -->
+                    <button id="refreshBtn" class="refresh-btn">Yenile</button>
+                </div>
+            </header>
+
+            <!-- Haber Kartları Izgarası (F4, F7b) -->
+            <section id="newsContainer" class="news-grid">
+                <!-- Boş Durum (Empty State) -->
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#bdc3c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8l-4 4v14a2 2 0 0 0 2 2z"></path>
+                        <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+                        <path d="M10 13h4"></path>
+                        <path d="M10 17h4"></path>
+                        <path d="M14 9h-4"></path>
+                    </svg>
+                    <p>Henüz haber yok. Sol taraftan bir RSS kaynağı ekleyin ve Yenile'ye basın.</p>
+                </div>
+                <!-- Haber kartları ve Skeleton loading buraya gelecek -->
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL: Haber Detay Penceresi (F10) -->
+    <div id="newsModal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="closeModalBtn" class="close-btn">&times;</button>
+            <div id="modalBody">
+                <!-- JS (openModal) tarafından dinamik doldurulur -->
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
