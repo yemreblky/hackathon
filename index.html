@@ -1,97 +1,115 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Sicht - Endüstriyel Haber Radarı</title>
+    <title>BIOS Pro Sicht - Endüstriyel Radar</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- Sol Panel: Akıllı Haber & RSS Ekleme -->
+        
+        <!-- Sol Panel: GİZLENEN VE ÜSTÜNE GELİNCE KAYARAK AÇILAN MENÜ -->
         <aside class="sidebar">
-            <h2>Haber Radarı</h2>
+            <div class="brand-header">
+                <h2>BIOS Radar</h2>
+                <span class="brand-subtitle">Industrial Engineering</span>
+            </div>
+            
             <div class="rss-input-group">
                 <input type="text" id="rssUrlInput" placeholder="RSS veya Haber Linki...">
                 <button id="addRssBtn" title="Otomatik algılar ve ekler">Ekle</button>
             </div>
             <ul id="rssList" class="rss-list">
-                <!-- JS tarafından dinamik doldurulur -->
+                <!-- JS tarafından doldurulur -->
             </ul>
+
+            <div class="sidebar-footer">
+                <a href="#" class="sidebar-link">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    Help & Documentation
+                </a>
+                <a href="#" class="sidebar-link">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    Contact Us
+                </a>
+            </div>
         </aside>
 
         <!-- Ana İçerik Alanı -->
         <main class="main-content">
             <header class="top-bar">
-                <!-- Arama Kutusu -->
+                
+                <!-- SOL: Arama Kutusu -->
                 <div class="search-box">
                     <input type="text" id="searchInput" placeholder="Haberlerde veya şirketlerde ara...">
                 </div>
                 
+                <!-- ORTA: Modernize Edilmiş Hap (Pill) Filtreler -->
                 <div class="filters">
-                    <!-- Sıralama Seçenekleri -->
                     <select id="sortFilter">
                         <option value="default">Sırala: Varsayılan</option>
                         <option value="scoreDesc">Skor (Yüksekten Düşüğe)</option>
                         <option value="scoreAsc">Skor (Düşükten Yükseğe)</option>
                         <option value="dateDesc">Tarih (En Yeni)</option>
                         <option value="dateAsc">Tarih (En Eski)</option>
-                        <option value="source">Kaynak (A-Z)</option>
                     </select>
 
-                    <!-- Tarih Filtresi -->
-                    <input type="date" id="dateFilter">
+                    <!-- YENİ: İkonlu Özel Tarih Seçici -->
+                <!-- YENİ: Akıllı Tarih Seçici ("gg.aa.yyyy" gizlenmiş hali) -->
+                <div class="date-picker-container" title="Tarihe Göre Filtrele">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <input type="text" id="dateFilter" placeholder="Tarih Seç" onfocus="(this.type='date')" onblur="if(!this.value)this.type='text'">
+                </div>
     
-                    <!-- Minimum Skor Filtresi -->
                     <select id="scoreFilter">
                         <option value="0">Min. Skor: Tümü</option>
                         <option value="50">Skor: 50+</option>
                         <option value="80">Skor: 80+</option>
                     </select>
 
-                    <!-- Slayt 7.3'e Birebir Uyumlu Olay Tipi Filtresi -->
-                    <select id="typeFilter" style="max-width: 300px;">
-                        <option value="all">Tüm Olaylar</option>
-                        <option value="relocation">Bir fabrikanın / üretim hattının başka bir lokasyona taşınması</option>
-                        <option value="closure">Tesis kapanışı, küçülme, üretimi durdurma</option>
-                        <option value="expansion">Mevcut tesisin büyütülmesi, kapasite artışı</option>
-                        <option value="new_plant">Yeni fabrika / greenfield yatırım duyurusu</option>
-                        <option value="tender">İhale, tedarik veya satın alma duyurusu</option>
-                        <option value="other">Yukarıdakilerin hiçbiri / belirsiz</option>
+                    <select id="typeFilter">
+                        <option value="all">Olay Tipi: Tüm Olaylar</option>
+                        <option value="relocation">Taşıma (Relocation)</option>
+                        <option value="closure">Kapanış (Closure)</option>
+                        <option value="expansion">Genişleme (Expansion)</option>
+                        <option value="new_plant">Yeni Yatırım (Greenfield)</option>
+                        <option value="tender">İhale (Tender)</option>
+                        <option value="other">Diğer</option>
                     </select>
+                </div>
 
-                    <!-- Son Güncelleme Zamanı -->
-                    <span id="lastUpdate" style="font-size: 0.8rem; color: #64748b; align-self: center; margin-right: 5px; font-weight: 500;"></span>
-                    
-                    <!-- Manuel Yenileme Butonu -->
+                <!-- SAĞ: Tema Butonu, Güncelleme Saati ve Yenile Butonu -->
+                <div class="top-bar-right">
+                    <span id="lastUpdate" class="last-update"></span>
+                    <button id="themeToggleBtn" class="theme-btn" title="Temayı Değiştir">🌙</button>
                     <button id="refreshBtn" class="refresh-btn">Yenile</button>
                 </div>
+
             </header>
 
-            <!-- Haber Kartları Izgarası -->
             <section id="newsContainer" class="news-grid">
-                <!-- Boş Durum (Empty State) -->
                 <div id="emptyState" class="empty-state" style="display: none;">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#bdc3c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--border-color)" stroke-width="2">
                         <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8l-4 4v14a2 2 0 0 0 2 2z"></path>
                         <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
-                        <path d="M10 13h4"></path>
-                        <path d="M10 17h4"></path>
-                        <path d="M14 9h-4"></path>
                     </svg>
-                    <p>Henüz haber yok. Sol taraftan bir link ekleyin ve Yenile'ye basın.</p>
+                    <p>Henüz haber yok. Lütfen sol taraftan bir kaynak ekleyin.</p>
                 </div>
             </section>
         </main>
     </div>
 
-    <!-- MODAL: Haber Detay Penceresi -->
+    <!-- MODAL -->
     <div id="newsModal" class="modal-overlay">
         <div class="modal-content">
             <button id="closeModalBtn" class="close-btn">&times;</button>
-            <div id="modalBody">
-                <!-- JS tarafından dinamik doldurulur -->
-            </div>
+            <div id="modalBody"></div>
         </div>
     </div>
 
