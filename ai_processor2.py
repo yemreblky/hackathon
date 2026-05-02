@@ -1,28 +1,9 @@
 import sqlite3
 import json
 import requests
-from bs4 import BeautifulSoup  
 
 OLLAMA_URL = "http://10.176.238.241:11434/api/chat"
 MODEL_NAME = "euro-radar" 
-
-# --- EKLENEN HABER KAZIYICI (SCRAPER) FONKSİYONU ---
-def haberi_tamamen_kazi(url):
-    """Linkin içine girip makalenin tam metnini (paragrafları) çeker"""
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(url, headers=headers, timeout=5)
-        soup = BeautifulSoup(response.content, 'html.parser')
-
-        paragraflar = soup.find_all('p')
-        tam_metin = " ".join([p.text for p in paragraflar if len(p.text) > 40])
-        
-        return tam_metin[:3000] if tam_metin else None
-    except Exception:
-        return None
-# ---------------------------------------------------
 
 # --- ADEM'İN HARİKA BIOS-FIT HESAPLAMA ALGORİTMASI ---
 def calculate_bios_fit_score(ai_json, source_url):
@@ -84,6 +65,7 @@ def process_news_with_adem():
     conn = sqlite3.connect('hackathon.db')
     cursor = conn.cursor()
     
+    # DİKKAT: Artık veritabanından 'original_link' verisini de çekiyoruz çünkü Adem'in formülü URL'ye bakarak puan veriyor!
     cursor.execute("SELECT id, title, original_link FROM articles WHERE event_type IS NULL")
     articles = cursor.fetchall()
     
@@ -100,19 +82,11 @@ def process_news_with_adem():
         
         print(f"-> Gönderiliyor: {title}")
         
-        # --- İŞTE SİHİRLİ DOKUNUŞ BURADA ---
-        # 1. Önce linke gidip haberi kazıyoruz
-        gercek_metin = haberi_tamamen_kazi(original_link)
-        
-        # 2. Site izin verdiyse devasa tam metni kullan, vermediyse B planı olarak sadece başlığı kullan
-        kullanilacak_metin = gercek_metin if gercek_metin else title
-        # -----------------------------------
-        
+        # Adem'in modelinden sadece ham varlıkları (entity) istiyoruz
         payload = {
             "model": MODEL_NAME,
             "messages": [
-                # PROMPT GÜNCELLENDİ: Artık başlığı değil, kullanılan dev metni okuyor.
-                {"role": "user", "content": f"Sen bir sanayi analistisin. Haberi analiz et ve SADECE JSON formatında event_type, company, sector, from_location, to_location, summary_tr alanlarını doldurarak çıktı ver. Haber Metni: {kullanilacak_metin}"}
+                {"role": "user", "content": f"Haberi analiz et ve SADECE JSON formatında event_type, company, sector, from_location, to_location, summary_tr alanlarını doldurarak çıktı ver. Haber: {title}"}
             ],
             "format": "json",
             "stream": False
@@ -126,8 +100,10 @@ def process_news_with_adem():
             cleaned_content = raw_content.replace('```json', '').replace('```', '').strip()
             ai_data = json.loads(cleaned_content)
             
+            # İŞTE SİHİR BURADA: Yapay zekanın çıkardığı ham veriyi Adem'in formülüne sokuyoruz!
             final_data = calculate_bios_fit_score(ai_data, original_link)
             
+            # 1. Articles tablosunu güncelle
             cursor.execute("""
                 UPDATE articles 
                 SET event_type = ?, company_name = ?, sector = ?, from_location = ?, to_location = ?, text_summary_tr = ?
@@ -142,6 +118,7 @@ def process_news_with_adem():
                 article_id
             ))
             
+            # 2. Scores tablosunu Adem'in formülünden dönen kesin puanla güncelle
             cursor.execute("""
                 INSERT INTO scores (article_id, score, score_confidence, rationale_tr, recommended_action)
                 VALUES (?, ?, ?, ?, ?)
