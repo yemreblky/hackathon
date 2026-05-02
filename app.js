@@ -1,4 +1,6 @@
-// --- DOM ELEMENTLERİ ---
+// ==========================================
+// --- DOM ELEMENTLERİ (Arayüz Bileşenleri) ---
+// ==========================================
 const newsContainer = document.getElementById('newsContainer');
 const refreshBtn = document.getElementById('refreshBtn');
 const emptyState = document.getElementById('emptyState');
@@ -8,21 +10,29 @@ const scoreFilter = document.getElementById('scoreFilter');
 const dateFilter = document.getElementById('dateFilter');
 const sortFilter = document.getElementById('sortFilter'); 
 const lastUpdateSpan = document.getElementById('lastUpdate');
-const rssUrlInput = document.getElementById('rssUrlInput');
-const addRssBtn = document.getElementById('addRssBtn');
+
+// Tek Buton ve Tek Input
+const linkInput = document.getElementById('rssUrlInput');
+const addBtn = document.getElementById('addRssBtn');
 const rssList = document.getElementById('rssList');
 
-// Modal Elementleri
+// Modal (Açılır Pencere) Elementleri
 const modalOverlay = document.getElementById('newsModal');
 const closeModalBtn = document.getElementById('closeModalBtn');
 const modalBody = document.getElementById('modalBody');
 
-// --- API YAPILANDIRMASI ---
+// ==========================================
+// --- API YAPILANDIRMASI VE STATE (Durum) ---
+// ==========================================
+// DİKKAT: Aynı ağda (Wi-Fi) çalışırken bu IP adresi Yunus'un bilgisayarının IPv4 adresi olmalıdır!
 const API_BASE_URL = 'http://10.176.238.59:5000/api';
+
 let allNews = []; 
 let savedRssLinks = []; 
 
-// --- 1. BACKEND'DEN VERİ ÇEKME ---
+// ==========================================
+// --- 1. BACKEND'DEN VERİ ÇEKME İŞLEMLERİ ---
+// ==========================================
 
 async function fetchRssList() {
     try {
@@ -46,99 +56,128 @@ async function fetchNews() {
         }
     } catch (error) {
         console.error("Haberler çekilirken hata:", error);
-        newsContainer.innerHTML = '<p style="color:red; text-align:center;">Sunucuya bağlanılamadı. Backend aktif mi?</p>';
+        newsContainer.innerHTML = '<p style="color:red; text-align:center; padding: 20px;">Sunucuya bağlanılamadı. Backend (Yunus) aktif mi?</p>';
     }
 }
 
-// --- 2. RSS YÖNETİMİ ---
+// ==========================================
+// --- 2. AKILLI VERİ EKLEME VE SİLME İŞLEMLERİ ---
+// ==========================================
 
-addRssBtn.addEventListener('click', async () => {
-    const url = rssUrlInput.value.trim();
-    
-    // 1. Boş Alan Kontrolü
+// A) AKILLI LİNK EKLEME (RSS veya Tekil Haber Otomatik Algılanır)
+addBtn.addEventListener('click', async () => {
+    const url = linkInput.value.trim();
     if (!url) {
-        alert("Lütfen bir RSS linki girin.");
+        alert("Lütfen bir link girin.");
         return;
     }
 
-    // --- 2. GEÇERLİ URL FORMATI KONTROLÜ (DÜZELTİLDİ) ---
     try {
         const parsedUrl = new URL(url);
-        // Sadece http veya https ile başlayan geçerli linkleri kabul et
-        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-            throw new Error("Geçersiz protokol");
-        }
-    } catch (error) {
-        alert("Hata: Geçersiz bir URL formatı girdiniz. Linkin 'http://' veya 'https://' ile başladığından emin olun.");
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') throw new Error();
+    } catch {
+        alert("Geçersiz URL formatı.");
         return;
     }
-    // --------------------------------------------------
 
-    // 3. Frontend Tarafında Mükerrer Kontrolü
     const isDuplicate = savedRssLinks.some(rss => rss.url.toLowerCase() === url.toLowerCase());
     if (isDuplicate) {
-        alert("Bilgi: Bu RSS bağlantısı zaten listenizde mevcut.");
+        alert("Bilgi: Bu kaynak zaten sol menüde ekli.");
         return;
     }
 
-    addRssBtn.innerText = "Ekleniyor...";
+    addBtn.innerText = "İnceleniyor...";
     try {
-        // Backend'e (SQLite'a) yazma isteği
-        const response = await fetch(`${API_BASE_URL}/rss`, {
+        // Yunus'un 'add-link' (Dedektif) rotasına gönderiyoruz
+        const response = await fetch(`${API_BASE_URL}/add-link`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: url })
         });
 
         if(response.ok) {
-            rssUrlInput.value = '';
-            await fetchRssList(); 
+            const data = await response.json();
+            
+            if (data.type === 'rss') {
+                await fetchRssList(); // RSS ise sol menüyü güncelle
+            } else {
+                // Tekil haber ise uyarı ver
+                alert("📰 Tekil haber başarıyla kaydedildi! Yapay zekanın okuması için üstteki 'Yenile' butonuna basın.");
+            }
+            
+            linkInput.value = ''; // Kutuyu temizle
         } else if (response.status === 409) {
-            alert("Backend: Bu RSS kaynağı zaten veritabanında kayıtlı.");
+            alert("Bu link zaten sistemde kayıtlı.");
         } else {
-            alert("Beklenmeyen bir hata oluştu. Link geçerli bir RSS kaynağı olmayabilir.");
+            alert("Hata: Link okunamadı. Sitenin güvenliği izin vermiyor olabilir.");
         }
     } catch (error) {
-        alert("Sunucu hatası: Backend (Flask) çalışıyor mu?");
+        alert("Sunucu hatası: Backend (Yunus) ile bağlantı kurulamadı.");
     } finally {
-        addRssBtn.innerText = "Ekle";
+        addBtn.innerText = "Ekle";
     }
 });
 
+// B) RSS Kaynağı Silme (Sol Panelden Kökten Temizlik)
 window.deleteRss = async (id) => {
+    if(!confirm("Bu kaynağı ve içindeki tüm haberleri silmek istediğinize emin misiniz?")) return;
     try {
-        await fetch(`${API_BASE_URL}/rss/${id}`, { method: 'DELETE' });
-        await fetchRssList();
+        const response = await fetch(`${API_BASE_URL}/rss/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+            await fetchRssList(); // Menüyü temizle
+            await fetchNews();    // Ekrandaki haberleri temizle
+        } else {
+            alert("Sunucudan silinirken bir hata oluştu.");
+        }
     } catch (error) {
-        alert("Silinemedi.");
+        alert("Silinemedi. Sunucu bağlantısını kontrol edin.");
     }
 };
 
-// --- 3. YENİLEME BUTONU ---
+// C) Tekil Haber Silme (Kart Üzerindeki Çöp Kutusu)
+window.deleteArticle = async (event, id) => {
+    event.stopPropagation(); // Modalin (detay penceresinin) açılmasını engeller
+    if(!confirm("Bu haberi tamamen silmek istediğinize emin misiniz?")) return;
+    try {
+        const response = await fetch(`${API_BASE_URL}/news/${id}`, { method: 'DELETE' });
+        if(response.ok) {
+            await fetchNews(); // Haberi ekrandan anında yok et
+        } else {
+            alert("Haber silinirken sunucuda bir hata oluştu.");
+        }
+    } catch(e) {
+        alert("Sunucu bağlantısı kurulamadı.");
+    }
+};
+
+// ==========================================
+// --- 3. YENİLEME VE YAPAY ZEKA TETİKLEME ---
+// ==========================================
 
 refreshBtn.addEventListener('click', async () => {
-    refreshBtn.innerText = "Yükleniyor...";
+    refreshBtn.innerText = "Sistem Çalışıyor...";
     showSkeleton();
-    
     try {
-        // Backend'e "Yeni haberleri çek ve LLM ile analiz et" emrini gönder
         const response = await fetch(`${API_BASE_URL}/refresh`, { method: 'POST' });
-        
         if(response.ok) {
             await fetchRssList(); 
             await fetchNews();    
             updateTimestamp();
         } else {
-            alert("Yenileme sırasında sunucu hatası.");
+            alert("Yenileme sırasında sunucu hatası. (Adem'in Ollama modeli açık mı?)");
+            await fetchNews();
         }
     } catch (error) {
-        alert("Sunucuya ulaşılamadı.");
+        alert("Sunucuya ulaşılamadı. Yunus'un Python ekranını kontrol edin.");
+        await fetchNews();
     } finally {
         refreshBtn.innerText = "Yenile";
     }
 });
 
-// --- 4. RENDER & FİLTRELEME FONKSİYONLARI ---
+// ==========================================
+// --- 4. RENDER (Çizim) VE FİLTRELEME İŞLEMLERİ ---
+// ==========================================
 
 function renderRssList() {
     rssList.innerHTML = '';
@@ -149,7 +188,6 @@ function renderRssList() {
 
     savedRssLinks.forEach((rss) => {
         const li = document.createElement('li');
-        // Eğer veritabanından status 'Hata' dönerse kırmızı, 'active' dönerse yeşil yap[cite: 8, 10]
         const isError = rss.status && (rss.status.includes("Hata") || rss.status.includes("error"));
         li.style.cssText = `display:flex; flex-direction:column; padding:10px; background:#334155; margin-bottom:8px; border-radius:6px; font-size:0.8rem; border-left: 4px solid ${isError ? '#ef4444' : '#10b981'}`;
 
@@ -178,12 +216,17 @@ function renderNews(newsArray) {
         const card = document.createElement('div');
         card.className = 'news-card';
         
-        // Veritabanı[cite: 10] sütunlarıyla birebir eşleştirme
-        const companyName = news.company_name || 'Bilinmiyor';
-        const dateStr = news.published_at_utc ? news.published_at_utc.substring(0, 10) : '-';
-        const summary = news.text_summary_tr || 'Özet bekleniyor...';
+        const companyName = news.company || news.company_name || 'Bilinmiyor';
+        const summary = news.summary_tr || news.text_summary_tr || 'Özet bilgisi bulunamadı.';
+        const dateStr = news.date || news.published_at_utc || '-';
         const score = news.score || 0;
 
+        let formattedDate = dateStr;
+        if(dateStr !== '-' && dateStr.length >= 10) {
+            formattedDate = dateStr.substring(0, 10);
+        }
+
+        // Kart Şablonu
         card.innerHTML = `
             <div class="card-header">
                 <span class="event-badge tag-${news.event_type || 'other'}">${getEventLabel(news.event_type)}</span>
@@ -191,11 +234,15 @@ function renderNews(newsArray) {
             </div>
             <h3 class="news-title">${news.title}</h3>
             <p class="news-summary">${summary}</p>
-            <div class="card-footer">
-                <span>🏢 ${companyName}</span>
-                <span>📅 ${dateStr}</span>
+            <div class="card-footer" style="display: flex; justify-content: space-between; align-items: flex-end;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span>🏢 ${companyName}</span>
+                    <span>📅 ${formattedDate}</span>
+                </div>
+                <button onclick="deleteArticle(event, ${news.id})" style="background: none; border: none; cursor: pointer; font-size: 1.3rem; transition: 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'" title="Bu Haberi Sil">🗑️</button>
             </div>
         `;
+        
         card.addEventListener('click', () => openModal(news));
         newsContainer.appendChild(card);
     });
@@ -209,16 +256,12 @@ function applyFilters() {
     const sortBy = sortFilter.value;
 
     let filtered = allNews.filter(n => {
-        // Hata Buradaydı: 'n.company' yerine 'n.company_name' kullanılmalı
-        const matchesSearch = n.title.toLowerCase().includes(term) || 
-                              (n.company_name && n.company_name.toLowerCase().includes(term));
-        
+        const cName = n.company || n.company_name || "";
+        const matchesSearch = n.title.toLowerCase().includes(term) || cName.toLowerCase().includes(term);
         const matchesType = type === 'all' || n.event_type === type;
         const matchesScore = (n.score || 0) >= minScore;
-        
-        // Hata Buradaydı: 'n.date' yerine 'n.published_at_utc' kullanılmalı
-        const matchesDate = !selectedDate || 
-                            (n.published_at_utc && n.published_at_utc.startsWith(selectedDate));
+        const dStr = n.date || n.published_at_utc || "";
+        const matchesDate = !selectedDate || dStr.startsWith(selectedDate);
         
         return matchesSearch && matchesType && matchesScore && matchesDate;
     });
@@ -228,17 +271,19 @@ function applyFilters() {
     } else if (sortBy === 'scoreAsc') {
         filtered.sort((a, b) => (a.score || 0) - (b.score || 0));
     } else if (sortBy === 'dateDesc') {
-        // Hata Buradaydı: 'a.date' yerine 'a.published_at_utc' kullanılmalı
-        filtered.sort((a, b) => new Date(b.published_at_utc || 0) - new Date(a.published_at_utc || 0));
+        filtered.sort((a, b) => new Date(b.date || b.published_at_utc || 0) - new Date(a.date || a.published_at_utc || 0));
     }
 
     renderNews(filtered);
 }
 
-// Yardımcı Fonksiyonlar
+// ==========================================
+// --- 5. YARDIMCI FONKSİYONLAR ---
+// ==========================================
+
 function showSkeleton() {
     newsContainer.innerHTML = '';
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 6; i++) {
         const skel = document.createElement('div');
         skel.className = 'skeleton-card';
         skel.innerHTML = `<div class="skeleton-item" style="width:30%; height:20px;"></div><div class="skeleton-item skeleton-title"></div><div class="skeleton-item skeleton-text"></div><div class="skeleton-item skeleton-footer"></div>`;
@@ -253,9 +298,17 @@ function getScoreClass(score) {
     return 'score-none';
 }
 
+// Slayt 7.3'teki Etiket Sütununa Birebir Uyumlu (Kartlardaki rozetler için)
 function getEventLabel(type) {
-    const types = { relocation: 'Taşıma', closure: 'Kapanış', expansion: 'Genişleme', new_plant: 'Yatırım', tender: 'İhale' };
-    return types[type] || 'Diğer';
+    const types = { 
+        relocation: 'relocation', 
+        closure: 'closure', 
+        expansion: 'expansion', 
+        new_plant: 'new_plant', 
+        tender: 'tender', 
+        other: 'other' 
+    };
+    return types[type] || 'other';
 }
 
 function updateTimestamp() {
@@ -266,31 +319,36 @@ function updateTimestamp() {
 function openModal(news) {
     modalOverlay.style.display = 'flex';
     
-    // Veritabanı[cite: 10] sütunlarıyla birebir eşleştirme
-    const companyName = news.company_name || '-';
-    const summary = news.text_summary_tr || 'Özet bilgisi bulunamadı.';
+    const companyName = news.company || news.company_name || '-';
+    const summary = news.summary_tr || news.text_summary_tr || 'Özet bilgisi bulunamadı.';
     const score = news.score || 0;
 
     modalBody.innerHTML = `
         <div class="card-header" style="margin-bottom:15px; padding-right:35px;">
-            <span class="event-badge tag-${news.event_type}">${getEventLabel(news.event_type)}</span>
+            <span class="event-badge tag-${news.event_type || 'other'}">${getEventLabel(news.event_type)}</span>
             <span class="score-badge ${getScoreClass(score)}">Skor: ${score}</span>
         </div>
         <h2>${news.title}</h2>
-        <p class="modal-summary" style="margin: 15px 0;">${summary}</p>
+        <p class="modal-summary" style="margin: 15px 0; font-size: 1.1rem; line-height: 1.6; color: #334155;">${summary}</p>
+        
         <div class="modal-details-grid">
             <div class="detail-item"><span class="detail-label">Şirket</span><span class="detail-value">${companyName}</span></div>
             <div class="detail-item"><span class="detail-label">Sektör</span><span class="detail-value">${news.sector || '-'}</span></div>
             <div class="detail-item"><span class="detail-label">Nereden</span><span class="detail-value">${news.from_location || '-'}</span></div>
             <div class="detail-item"><span class="detail-label">Nereye</span><span class="detail-value">${news.to_location || '-'}</span></div>
         </div>
-        <a href="${news.original_link || '#'}" class="source-link" target="_blank">Orijinal Kaynağa Git</a>
+        
+        <div style="margin-top: 20px; text-align: right;">
+            <a href="${news.original_link || '#'}" class="source-link" target="_blank">Orijinal Habere Git ➔</a>
+        </div>
     `;
 }
 
-// Event Listeners
+// Olay Dinleyicileri
 closeModalBtn.addEventListener('click', () => modalOverlay.style.display = 'none');
-modalOverlay.addEventListener('click', (e) => { if(e.target === modalOverlay) modalOverlay.style.display = 'none'; });
+modalOverlay.addEventListener('click', (e) => { 
+    if(e.target === modalOverlay) modalOverlay.style.display = 'none'; 
+});
 searchInput.addEventListener('input', applyFilters);
 typeFilter.addEventListener('change', applyFilters);
 scoreFilter.addEventListener('change', applyFilters);
