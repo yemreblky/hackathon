@@ -37,6 +37,13 @@
 * **Veri Toplama:** `requests`, `BeautifulSoup4`, `feedparser`, `duckduckgo_search`.
 * **Yapay Zeka:** Lokal Ollama sunucusu (Llama3 tabanlı özel `euro-radar` modeli).
 
+* RSS Kaynaklarımız:
+* https://news.google.com/rss/search?q=%22new+manufacturing+facility%22+OR+%22greenfield+investment%22+OR+%22fdi+manufacturing%22&hl=en-US&gl=US&ceid=US:en
+* https://news.google.com/rss/search?q=%22factory+expansion%22+OR+%22plant+expansion%22+OR+%22capacity+increase%22&hl=en-US&gl=US&ceid=US:en
+* https://news.google.com/rss/search?q=%22plant+closure%22+OR+%22factory+closure%22+OR+%22cease+operations%22&hl=en-US&gl=US&ceid=US:en
+* https://news.google.com/rss/search?q=%22factory+relocation%22+OR+%22plant+relocation%22+OR+%22corporate+relocation%22&hl=en-US&gl=US&ceid=US:en
+* https://www.manufacturingdive.com/feeds/news/
+
 ---
 
 ## ⚙️ Kurulum ve Çalıştırma
