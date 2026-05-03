@@ -88,7 +88,7 @@ showFavoritesBtn.addEventListener('click', () => {
 // ==========================================
 // --- API YAPILANDIRMASI ---
 // ==========================================
-const API_BASE_URL = 'http://10.176.238.59:5000/api';
+const API_BASE_URL = '/api';
 
 let allNews = []; 
 let savedRssLinks = []; 
@@ -393,16 +393,8 @@ function applyFilters() {
         return matchesSearch && matchesType && matchesScore && matchesDate;
     });
 
-    // SIRALAMA MANTIĞI BURADA DÜZELTİLDİ
-    if (sortBy === 'scoreDesc') {
-        filtered.sort((a, b) => (b.score || 0) - (a.score || 0));
-    } else if (sortBy === 'scoreAsc') {
-        filtered.sort((a, b) => (a.score || 0) - (b.score || 0));
-    } else if (sortBy === 'dateDesc') {
-        filtered.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-    } else if (sortBy === 'dateAsc') {
-        filtered.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    }
+    if (sortBy === 'scoreDesc') filtered.sort((a, b) => (b.score || 0) - (a.score || 0));
+    else if (sortBy === 'dateDesc') filtered.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
     renderNews(filtered);
 }

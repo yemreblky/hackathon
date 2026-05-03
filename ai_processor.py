@@ -2,6 +2,7 @@ import sqlite3
 import json
 import requests
 from bs4 import BeautifulSoup  
+from duckduckgo_search import DDGS # YENİ: Çapraz doğrulama kütüphanesi eklendi
 
 OLLAMA_URL = "http://10.176.238.241:11434/api/chat"
 MODEL_NAME = "euro-radar" 
@@ -14,6 +15,7 @@ def haberi_tamamen_kazi(url):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36'
         }
         response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status() # Hatalı HTTP kodlarını yakalamak için
         soup = BeautifulSoup(response.content, 'html.parser')
 
         paragraflar = soup.find_all('p')
@@ -23,6 +25,48 @@ def haberi_tamamen_kazi(url):
     except Exception:
         return None
 # ---------------------------------------------------
+
+# --- ÇAPRAZ DOĞRULAMA (CROSS-VALIDATION) FONKSİYONU ---
+# --- ÇAPRAZ DOĞRULAMA (CROSS-VALIDATION) FONKSİYONU (GELİŞMİŞ) ---
+def verify_news_cross_reference(company, event_type, location):
+    """Haberi internette aratıp başka kaynaklarca doğrulanıp doğrulanmadığını KATI ŞEKİLDE kontrol eder."""
+    if not company or not location:
+        return False
+        
+    search_query = f'"{company}" {event_type} {location} news'
+    company_lower = company.lower()
+    event_lower = event_type.lower()
+    
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(search_query, max_results=5))
+            found_sources = 0
+            
+            for res in results:
+                url = res.get('href', '').lower()
+                title = res.get('title', '').lower()
+                body = res.get('body', '').lower()
+                
+                # 1. Kural: Kaynak o premium sitelerden biri mi?
+                is_premium_source = any(domain in url for domain in ["bloomberg", "reuters", "news", "finance", "industry", "supplychain", "yahoo", "ft.com"])
+                
+                # 2. Kural (YENİ VE KATI): Arama sonucunun başlığında veya özetinde Şirket Adı VE Olay Tipi (veya eşanlamlısı) geçiyor mu?
+                is_content_relevant = (company_lower in title or company_lower in body) and \
+                                      (event_lower in title or event_lower in body or "plant" in title or "facility" in title or "factory" in title)
+                
+                # EĞER hem kaynak güvenilirse HEM DE içerik gerçekten bizim olayımızdan bahsediyorsa puan ver!
+                if is_premium_source and is_content_relevant:
+                    found_sources += 1
+                    
+            if found_sources >= 1:
+                return True
+                
+    except Exception as e:
+        print(f"    [UYARI] Doğrulama motoru geçici olarak cevap vermiyor: {e}")
+        
+    return False
+# --------------------------------------------------------
+# --------------------------------------------------------
 
 # --- ADEM'İN HARİKA BIOS-FIT HESAPLAMA ALGORİTMASI ---
 def calculate_bios_fit_score(ai_json, source_url):
@@ -44,18 +88,52 @@ def calculate_bios_fit_score(ai_json, source_url):
 
     # 2. A: Aktör Netliği (Actor Clarity) - Ağırlık: %25
     A = 0.0
+    # 1. Şirket ve Sektör (Sabitler)
     if is_valid(ai_json.get("company")): A += 0.40
-    if is_valid(ai_json.get("from_location")): A += 0.25
-    if is_valid(ai_json.get("to_location")): A += 0.25
     if is_valid(ai_json.get("sector")): A += 0.10
-    A = min(A, 1.0) # Toplamın 1'i geçmemesi için güvenlik
+
+    # 2. Lokasyon Puanlaması (Haber Tipine Göre Dinamik)
+    event_type_str = str(ai_json.get("event_type", "other")).lower()
+    has_from = is_valid(ai_json.get("from_location"))
+    has_to = is_valid(ai_json.get("to_location"))
+
+    if event_type_str == "relocation":
+        if has_from: A += 0.25
+        if has_to: A += 0.25
+    elif event_type_str in ["new_plant", "expansion"]:
+        if has_to: A += 0.50
+    elif event_type_str == "closure":
+        if has_from: A += 0.50
+    else:
+        if has_from or has_to: A += 0.50
+
+    A = min(A, 1.0)
 
     # 3. G: Coğrafya (Geography) - Ağırlık: %20
     G = 0.30 # Varsayılan: Bilinmiyor = 0.30
     locations = f"{ai_json.get('from_location', '')} {ai_json.get('to_location', '')}".lower()
     
-    avrupa_ici = ["türkiye", "almanya", "fransa", "ingiltere", "birleşik krallık", "italya", "ispanya", "polonya", "romanya", "bulgaristan", "yunanistan", "sırbistan", "avrupa", "ab"]
-    komsular = ["rusya", "kuzey afrika", "mısır", "fas", "cezayir", "tunus", "ukrayna"]
+    avrupa_ici = [
+        "türkiye", "turkey", "almanya", "germany", "fransa", "france", 
+        "ingiltere", "uk", "united kingdom", "britain", "italya", "italy", 
+        "ispanya", "spain", "polonya", "poland", "romanya", "romania", 
+        "bulgaristan", "bulgaria", "yunanistan", "greece", "sırbistan", "serbia",
+        "hollanda", "netherlands", "belçika", "belgium", "isveç", "sweden",
+        "norveç", "norway", "danimarka", "denmark", "finlandiya", "finland",
+        "avusturya", "austria", "i̇sviçre", "switzerland", "çekya", "czechia", "czech republic",
+        "macaristan", "hungary", "irlanda", "ireland", "portekiz", "portugal",
+        "hırvatistan", "croatia", "slovakya", "slovakia", "slovenya", "slovenia",
+        "bosna", "bosnia", "karadağ", "montenegro", "arnavutluk", "albania",
+        "makedonya", "macedonia", "kosova", "kosovo", "letonya", "latvia",
+        "litvanya", "lithuania", "estonya", "estonia",
+        "avrupa", "europe", "ab", "eu"
+    ]
+    komsular = [
+        "rusya", "russia", "kuzey afrika", "north africa", "mısır", "egypt", 
+        "fas", "morocco", "cezayir", "algeria", "tunus", "tunisia", 
+        "ukrayna", "ukraine", "belarus", "gürcistan", "georgia", 
+        "azerbaycan", "azerbaijan", "ermenistan", "armenia", "iran", 
+        "ırak", "iraq", "suriye", "syria", "ortadoğu", "middle east"]
     
     if any(ulke in locations for ulke in avrupa_ici):
         G = 1.00
@@ -79,14 +157,36 @@ def calculate_bios_fit_score(ai_json, source_url):
     C = 0.55 # Varsayılan: Genel haber sitesi = 0.55
     url = str(source_url).lower()
     
-    if any(domain in url for domain in ["ir.", "investor", "press-release", "corp.", "pr-newswire"]): 
-        C = 1.00 # Şirketin resmi sitesi / IR
-    elif any(domain in url for domain in ["reuters", "bloomberg", "ft.com", "handelsblatt"]): 
-        C = 0.85 # Saygın haber ajansı
-    elif any(domain in url for domain in ["industryweek", "manufacturing", "supplychainbrain", "tradefinance"]): 
-        C = 0.70 # Sektörel yayın
+    # YENİ: Genişletilmiş Güvenilir Kaynaklar ve Kalıplar
+    premium_sources = [
+        "reuters", "bloomberg", "ft.com", "handelsblatt", "industryweek", 
+        "manufacturing", "supplychainbrain", "tradefinance", "supplychaindive", 
+        "logisticsmanager", "automotivelogistics", "tipranks"
+    ]
+    official_patterns = [
+        "ir.", "investor", "press-release", "corp.", "pr-newswire", "newsroom", "media-center"
+    ]
+    
+    if any(domain in url for domain in premium_sources): 
+        C = 1.00 # Premium veya sektörel yayın
+    elif any(pattern in url for pattern in official_patterns):
+        C = 1.00 # Şirketin resmi bildirimi
     elif any(domain in url for domain in ["blog", "forum", "reddit", "medium"]): 
         C = 0.25 # Blog / forum
+    elif is_valid(ai_json.get("estimated_volume")):
+        C = 0.85 # Site bilinmiyor ama haberde somut hacim/rakam verisi var
+        
+    # YENİ: Çapraz Doğrulama (Cross-Validation) Devrede!
+    if C < 0.85:
+        company_name = ai_json.get("company")
+        event_type_str = ai_json.get("event_type", "")
+        location_to_search = ai_json.get("to_location") or ai_json.get("from_location")
+        
+        is_verified = verify_news_cross_reference(company_name, event_type_str, location_to_search)
+        
+        if is_verified:
+            print(f"    [DOĞRULANDI] {company_name} haberi başka güvenilir kaynaklarca onaylandı! (Güven: 1.00)")
+            C = 1.00 # Haber doğrulandı, puanı kurtardık!
 
     raw_score = 100 * (0.30 * E + 0.25 * A + 0.20 * G + 0.15 * T + 0.10 * C)
 
@@ -103,17 +203,19 @@ def calculate_bios_fit_score(ai_json, source_url):
     else:
         recommended_action = "archive"
 
+    confidence = A/2
+    if confidence < 0.4:
+        raw_score *= 0.5
+        
     # Puanları ve aksiyonu JSON'a ekle
     ai_json["score"] = round(raw_score)
-    ai_json["confidence"] = round(A, 2)
+    ai_json["confidence"] = confidence
     ai_json["source_url"] = source_url
     ai_json["recommended_action"] = recommended_action
 
     return ai_json
 
 #---------------------------------------------------
-
-
 
 def process_news_with_adem():
     conn = sqlite3.connect('hackathon.db')
