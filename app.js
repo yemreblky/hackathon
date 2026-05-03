@@ -88,7 +88,7 @@ showFavoritesBtn.addEventListener('click', () => {
 // ==========================================
 // --- API YAPILANDIRMASI ---
 // ==========================================
-const API_BASE_URL = 'http://10.176.238.59:5000/api';
+const API_BASE_URL = '/api';
 
 let allNews = []; 
 let savedRssLinks = []; 

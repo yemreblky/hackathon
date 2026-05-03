@@ -1,4 +1,5 @@
-from flask import Flask, jsonify, request
+
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import sqlite3
 import requests
@@ -215,6 +216,19 @@ def add_smart_link():
         return jsonify({"error": "Bu link zaten sistemde kayıtlı."}), 409
     except Exception as e:
         return jsonify({"error": f"Link okunamadı: {str(e)}"}), 500
+
+
+@app.route('/')
+def serve_index():
+    # Ana sayfaya girildiğinde index.html'i gösterir
+    return send_from_directory('.', 'index.html')
+
+@app.route('/<path:filename>')
+def serve_static(filename):
+    # CSS ve JS dosyalarını (style.css, app.js vb.) sunar
+    return send_from_directory('.', filename)
+
+
 
 if __name__ == '__main__':
     # Bütün sistem 5000 portunda ayağa kalkar

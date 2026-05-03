@@ -34,12 +34,8 @@ def calculate_bios_fit_score(ai_json, source_url):
     # 1. E: Olay Tipi (Event Type) - Ağırlık: %30
     E = 0.10  # Varsayılan: other = 0.10
     
-    # LLM artık tekil etiket dönüyor.
     event_text = str(ai_json.get("event_type", "other")).lower()
 
-    # ZEKİCE KISIM: En yüksek puandan başlayarak arıyoruz. 
-    # Metin içinde birden fazla olay geçse bile, ilk (ve en yüksek) olanı bulduğunda
-    # E değerini atar ve diğer elif bloklarına girmez. Böylece otomatik olarak 'max' değeri almış oluruz.
     if "relocation" in event_text: E = 1.00
     elif "new_plant" in event_text: E = 0.90
     elif "expansion" in event_text: E = 0.75
@@ -70,7 +66,6 @@ def calculate_bios_fit_score(ai_json, source_url):
 
     # 4. T: Zaman Penceresi (Timeline) - Ağırlık: %15
     T = 0.30 # Varsayılan: Belirtilmemiş = 0.30
-    # LLM direkt "zaman" döndürmediği için, çıkardığı Türkçe özetin içinde kelime araması yapıyoruz
     summary_text = str(ai_json.get("summary_tr", "")).lower()
     
     if any(word in summary_text for word in ["duyuruldu", "taşınacak", "çeyrek", "yakın zaman", "0-6 ay", "kısa süre", "hemen"]):
@@ -93,13 +88,26 @@ def calculate_bios_fit_score(ai_json, source_url):
     elif any(domain in url for domain in ["blog", "forum", "reddit", "medium"]): 
         C = 0.25 # Blog / forum
 
-    # PDF'TEKİ AĞIRLIKLI FİNAL SKORU HESAPLAMA (Ekstra ceza çarpanları kaldırıldı)
     raw_score = 100 * (0.30 * E + 0.25 * A + 0.20 * G + 0.15 * T + 0.10 * C)
 
-    # Puanları sözlüğe ekle (Confidence veritabanında istendiği için formül içindeki saf netlik A'yı atıyoruz)
+    # --- DİNAMİK AKSİYON ATAMASI (Belgelerdeki Eşiklere Göre) ---
+    if raw_score >= 80:
+        recommended_action = "reach_out"
+    elif raw_score >= 65:
+        recommended_action = "monitor"
+    elif raw_score >= 50:
+        if "tender" in event_text:
+            recommended_action = "tender_watch"
+        else:
+            recommended_action = "partner_search"
+    else:
+        recommended_action = "archive"
+
+    # Puanları ve aksiyonu JSON'a ekle
     ai_json["score"] = round(raw_score)
-    ai_json["confidence"] = round(A, 2) # Güven skoru artık "Aktör Netliği" tablosundan geliyor
+    ai_json["confidence"] = round(A, 2)
     ai_json["source_url"] = source_url
+    ai_json["recommended_action"] = recommended_action
 
     return ai_json
 
@@ -127,18 +135,14 @@ def process_news_with_adem():
         
         print(f"-> Gönderiliyor: {title}")
         
-        # --- İŞTE SİHİRLİ DOKUNUŞ BURADA ---
-        # 1. Önce linke gidip haberi kazıyoruz
         gercek_metin = haberi_tamamen_kazi(original_link)
-        
-        # 2. Site izin verdiyse devasa tam metni kullan, vermediyse B planı olarak sadece başlığı kullan
         kullanilacak_metin = gercek_metin if gercek_metin else title
-        # -----------------------------------
         
+        # --- PROMPT GÜNCELLENDİ (rationale_tr eklendi) ---
         payload = {
             "model": MODEL_NAME,
             "messages": [
-                {"role": "user", "content": f"Sen bir sanayi analistisin. Haberi analiz et ve SADECE JSON formatında event_type, company, sector, from_location, to_location, summary_tr alanlarını doldurarak çıktı ver. event_type alanına SADECE haberdeki en önemli ANA OLAYI temsil eden TEK BİR ETİKET yaz (closure, relocation, new_plant, expansion, tender veya other). Asla liste veya virgüllü metin kullanma. Haber Metni: {kullanilacak_metin}"}
+                {"role": "user", "content": f"Sen bir sanayi analistisin. Haberi analiz et ve SADECE JSON formatında event_type, company, sector, from_location, to_location, summary_tr ve rationale_tr alanlarını doldurarak çıktı ver. event_type alanına SADECE haberdeki en önemli ANA OLAYI temsil eden TEK BİR ETİKET yaz (closure, relocation, new_plant, expansion, tender veya other). rationale_tr alanına ise bu haberin BIOS (endüstriyel taşıma/kurulum firması) için neden önemli veya önemsiz olduğuna dair 1 cümlelik Türkçe analist yorumu yaz. Haber Metni: {kullanilacak_metin}"}
             ],
             "format": "json",
             "stream": False
@@ -168,6 +172,7 @@ def process_news_with_adem():
                 article_id
             ))
             
+            # --- VERİTABANI KAYDI DİNAMİKLEŞTİRİLDİ ---
             cursor.execute("""
                 INSERT INTO scores (article_id, score, score_confidence, rationale_tr, recommended_action)
                 VALUES (?, ?, ?, ?, ?)
@@ -175,8 +180,8 @@ def process_news_with_adem():
                 article_id,
                 final_data.get("score", 0), 
                 final_data.get("confidence", 0.0),
-                "Algoritma ile kesin skorlandı.", 
-                "monitor"
+                final_data.get("rationale_tr", "Özel gerekçe üretilemedi."), 
+                final_data.get("recommended_action", "monitor")
             ))
             
             conn.commit()
