@@ -10,7 +10,7 @@
 
 ### 🧠 1. Yapay Zeka ve Gelişmiş Skorlama (AI & Scoring Engine)
 * **LLM Destekli Veri Çıkarımı:** Haber metinleri lokal Ollama sunucusundaki (`euro-radar` modeli) yapay zeka ile analiz edilir. Haberden olay tipi, şirket, lokasyonlar, sektör ve zaman çizelgesi gibi kritik veriler çekilir.
-* **Adem'in BIOS-Fit Skorlama Algoritması:** Haberlerin iş geliştirme fırsatı olarak değerini belirten 0-100 arası bir skor hesaplanır. Bu skor; Olay Tipi (%30), Aktör Netliği (%25), Coğrafya (%20), Zaman Penceresi (%15) ve Kaynak Güveni (%10) ağırlıklarıyla belirlenir.
+* **BIOS-Fit Skorlama Algoritması:** Haberlerin iş geliştirme fırsatı olarak değerini belirten 0-100 arası bir skor hesaplanır. Bu skor; Olay Tipi (%30), Aktör Netliği (%25), Coğrafya (%20), Zaman Penceresi (%15) ve Kaynak Güveni (%10) ağırlıklarıyla belirlenir.
 * **Dinamik Aksiyon Önerileri:** Hesaplanan skora göre satış ekibine "Hemen İletişime Geç", "İzlemeye Al" veya "Arşivle" gibi stratejik öneriler sunulur.
 
 ### 🕵️‍♂️ 2. Akıllı Kazıma ve Doğrulama (Scraping & Validation)
